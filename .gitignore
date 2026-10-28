@@ -1,0 +1,48 @@
+# ============ Node ============
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ============ Environment / Secrets ============
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ============ Build output ============
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+
+# ============ Vite ============
+.vite/
+frontend/dist/
+
+# ============ Logs ============
+logs/
+*.log
+
+# ============ OS junk ============
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============ Editor ============
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# ============ MySQL / DB dumps ============
+*.sql.bak
+*.dump
+mysql-data/

@@ -1,0 +1,17 @@
+{
+  "name": "lb-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "api": "node scripts/run-api.js",
+    "balance": "node balancer/server.js",
+    "balance:3": "cross-env API_PORTS=8001,8002,8003 node balancer/server.js",
+    "balance:5": "cross-env API_PORTS=8001,8002,8003,8004,8005 node balancer/server.js"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
