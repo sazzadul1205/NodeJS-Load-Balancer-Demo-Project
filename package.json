@@ -6,7 +6,11 @@
     "api": "node scripts/run-api.js",
     "balance": "node balancer/server.js",
     "balance:3": "cross-env API_PORTS=8001,8002,8003 node balancer/server.js",
-    "balance:5": "cross-env API_PORTS=8001,8002,8003,8004,8005 node balancer/server.js"
+    "balance:5": "cross-env API_PORTS=8001,8002,8003,8004,8005 node balancer/server.js",
+    "balance:blog": "cross-env API_PORTS=9001,9002,9003 node balancer/server.js",
+    "balance:blog:least": "cross-env API_PORTS=9001,9002,9003 STRATEGY=least-connections node balancer/server.js",
+    "balance:blog:random": "cross-env API_PORTS=9001,9002,9003 STRATEGY=random node balancer/server.js",
+    "balance:blog:weighted": "cross-env API_PORTS=9001,9002,9003 STRATEGY=weighted API_WEIGHTS=9001:1,9002:2,9003:1 node balancer/server.js"
   },
   "devDependencies": {
     "cross-env": "^7.0.3"
