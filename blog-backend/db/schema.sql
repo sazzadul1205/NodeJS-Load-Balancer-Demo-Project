@@ -1,0 +1,40 @@
+CREATE DATABASE IF NOT EXISTS blog CHARACTER SET utf8mb4;
+USE blog;
+
+CREATE TABLE IF NOT EXISTS users (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  username      VARCHAR(50)  NOT NULL UNIQUE,
+  email         VARCHAR(200) NOT NULL UNIQUE,
+  password_hash VARCHAR(100) NOT NULL,
+  bio           TEXT NULL,
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_users_email (email)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS posts (
+  id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  author_id  BIGINT UNSIGNED NOT NULL,
+  title      VARCHAR(200) NOT NULL,
+  slug       VARCHAR(220) NOT NULL UNIQUE,
+  excerpt    VARCHAR(500) NULL,
+  body       MEDIUMTEXT NOT NULL,
+  published  TINYINT(1) NOT NULL DEFAULT 1,
+  view_count BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_posts_author (author_id),
+  INDEX idx_posts_published_created (published, created_at DESC),
+  FULLTEXT INDEX ft_posts (title, body)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS comments (
+  id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  post_id    BIGINT UNSIGNED NOT NULL,
+  author_id  BIGINT UNSIGNED NOT NULL,
+  body       TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (post_id)   REFERENCES posts(id) ON DELETE CASCADE,
+  FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_comments_post_created (post_id, created_at DESC)
+) ENGINE=InnoDB;
