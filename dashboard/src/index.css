@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  @apply bg-base text-fg font-mono text-[13px] leading-normal antialiased;
+}
+
+/* Reusable button — defined once, applied everywhere */
+.btn {
+  @apply px-2.5 py-1 rounded border border-edge bg-panel-deep text-fg text-xs font-mono transition-colors;
+}
+.btn:hover:not(:disabled) {
+  @apply bg-panel-hover border-edge2;
+}
+.btn:disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
+.btn-primary {
+  @apply text-ok border-ok/40;
+}
+.btn-primary:hover:not(:disabled) {
+  @apply bg-ok/10 border-ok/40;
+}
+.btn-danger {
+  @apply text-err border-err/40;
+}
+.btn-danger:hover:not(:disabled) {
+  @apply bg-err/10 border-err/40;
+}
+.btn-ghost {
+  @apply bg-transparent text-muted border-transparent;
+}
+.btn-ghost:hover:not(:disabled) {
+  @apply bg-panel-hover text-fg;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a3444;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #374558;
+}

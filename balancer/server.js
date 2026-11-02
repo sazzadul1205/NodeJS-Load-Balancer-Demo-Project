@@ -548,6 +548,30 @@ async function handleAdmin(req, res, pathname) {
     return json(res, 200, { ok: true, strategy: s });
   }
 
+  // POST /admin/reset — zero every counter, keep health state.
+  // Health is *reality*, not bookkeeping — don't fake it.
+  if (req.method === "POST" && pathname === "/admin/reset") {
+    state.rrIndex = 0;
+    state.lbStats = {
+      startedAt: Date.now(),
+      totalRequests: 0,
+      totalProxied: 0,
+      total502: 0,
+      total503: 0,
+      total504: 0,
+      totalRetries: 0,
+    };
+    servers.forEach((s) => {
+      s.totalProxied = 0;
+      s.totalFailed = 0;
+      s.totalRetried = 0;
+      s.totalRetriesReceived = 0;
+      s.currentWeight = 0;
+    });
+    console.log("[admin] counters reset");
+    return json(res, 200, { ok: true, reset: "counters" });
+  }
+
   // POST /admin/servers/:name/(enable|disable|drain|undrain)
   const match = pathname.match(
     /^\/admin\/servers\/([^/]+)\/(enable|disable|drain|undrain)$/,
