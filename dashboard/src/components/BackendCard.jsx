@@ -1,3 +1,4 @@
+import { memo } from "react";
 import StatusBadge from "./StatusBadge.jsx";
 
 const BORDER = {
@@ -7,7 +8,7 @@ const BORDER = {
   draining: "border-l-warn",
 };
 
-export default function BackendCard({ server, busy, onAction }) {
+function BackendCard({ server, busy, onAction }) {
   const status = !server.enabled
     ? "disabled"
     : server.draining
@@ -18,7 +19,7 @@ export default function BackendCard({ server, busy, onAction }) {
 
   return (
     <div
-      className={`bg-panel border border-edge border-l-[3px] ${BORDER[status]} rounded-lg p-3 flex flex-col gap-2.5 ${
+      className={`bg-panel border border-edge border-l-[3px] ${BORDER[status]} rounded-lg p-3 flex flex-col gap-2.5 transition-opacity ${
         status === "disabled" ? "opacity-60" : ""
       }`}
     >
@@ -34,7 +35,10 @@ export default function BackendCard({ server, busy, onAction }) {
             {server.activeRequests}
           </span>
           {server.delta > 0 && (
-            <span className="text-ok text-[10px] font-semibold">
+            <span
+              key={server.totalProxied}
+              className="text-ok text-[10px] font-semibold animate-fade"
+            >
               +{server.delta}
             </span>
           )}
@@ -92,3 +96,21 @@ export default function BackendCard({ server, busy, onAction }) {
     </div>
   );
 }
+
+// Only re-render when the fields BackendCard actually uses have changed.
+export default memo(BackendCard, (prev, next) => {
+  if (prev.busy !== next.busy) return false;
+  if (prev.onAction !== next.onAction) return false;
+  const a = prev.server;
+  const b = next.server;
+  return (
+    a.name === b.name &&
+    a.enabled === b.enabled &&
+    a.healthy === b.healthy &&
+    a.draining === b.draining &&
+    a.activeRequests === b.activeRequests &&
+    a.totalProxied === b.totalProxied &&
+    a.delta === b.delta &&
+    a.lastError === b.lastError
+  );
+});

@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, memo } from "react";
 
 const Terminal = forwardRef(function Terminal({ cmd, setCmd, onKeyDown }, ref) {
   return (
@@ -19,4 +19,4 @@ const Terminal = forwardRef(function Terminal({ cmd, setCmd, onKeyDown }, ref) {
   );
 });
 
-export default Terminal;
+export default memo(Terminal);

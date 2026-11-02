@@ -1,6 +1,7 @@
+import { memo } from "react";
 import StatusBadge from "./StatusBadge.jsx";
 
-export default function TestsPanel({
+function TestsPanel({
   tests,
   testState,
   runningTestId,
@@ -95,3 +96,5 @@ export default function TestsPanel({
     </div>
   );
 }
+
+export default memo(TestsPanel);

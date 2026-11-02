@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { LB_URL, TARGET_PATH } from "../api.js";
 
 const CONCURRENCY = 20;
@@ -6,7 +6,10 @@ const CONCURRENCY = 20;
 export function useTraffic(log) {
   const [distribution, setDistribution] = useState({});
   const [trafficRunning, setTrafficRunning] = useState(false);
+  const [burstProgress, setBurstProgress] = useState(null);
   const trafficRef = useRef({ running: false, timer: null });
+  const logRef = useRef(log);
+  const burstInFlightRef = useRef(false);
 
   const fireOne = useCallback(async () => {
     const t0 = performance.now();
@@ -22,24 +25,41 @@ export function useTraffic(log) {
 
   const burst = useCallback(
     async (n, { updateUI = true } = {}) => {
+      if (burstInFlightRef.current) {
+        return { dist: {}, ms: 0, n: 0, ok: 0, failures: [], skipped: true };
+      }
+      burstInFlightRef.current = true;
+
       const dist = {};
       const failures = [];
       const start = performance.now();
 
-      for (let i = 0; i < n; i += CONCURRENCY) {
-        const batch = Array.from(
-          { length: Math.min(CONCURRENCY, n - i) },
-          fireOne,
-        );
-        const results = await Promise.all(batch);
-        for (const r of results) {
-          dist[r.instance] = (dist[r.instance] || 0) + 1;
-          if (!r.ok) failures.push(r);
+      if (updateUI) setBurstProgress({ done: 0, total: n });
+
+      try {
+        for (let i = 0; i < n; i += CONCURRENCY) {
+          const size = Math.min(CONCURRENCY, n - i);
+          const batch = Array.from({ length: size }, fireOne);
+          const results = await Promise.all(batch);
+          for (const r of results) {
+            dist[r.instance] = (dist[r.instance] || 0) + 1;
+            if (!r.ok) failures.push(r);
+          }
+          // Incremental UI update — the chart moves as batches land.
+          if (updateUI) {
+            setDistribution({ ...dist });
+            setBurstProgress({ done: Math.min(i + size, n), total: n });
+          }
+        }
+      } finally {
+        burstInFlightRef.current = false;
+        if (updateUI) {
+          setBurstProgress(null);
+          setDistribution({ ...dist });
         }
       }
 
       const ms = Math.round(performance.now() - start);
-      if (updateUI) setDistribution(dist);
       return { dist, ms, n, ok: n - failures.length, failures };
     },
     [fireOne],
@@ -51,7 +71,7 @@ export function useTraffic(log) {
       trafficRef.current.running = true;
       setTrafficRunning(true);
       setDistribution({});
-      log?.("info", `traffic: ${rps} rps started`);
+      logRef.current?.("info", `traffic: ${rps} rps started`);
       const interval = 1000 / rps;
       const fire = async () => {
         if (!trafficRef.current.running) return;
@@ -60,7 +80,7 @@ export function useTraffic(log) {
       };
       fire();
     },
-    [fireOne, log],
+    [fireOne],
   );
 
   const stopTraffic = useCallback(() => {
@@ -68,15 +88,26 @@ export function useTraffic(log) {
     trafficRef.current.running = false;
     setTrafficRunning(false);
     clearTimeout(trafficRef.current.timer);
-    log?.("info", "traffic: stopped");
-  }, [log]);
+    logRef.current?.("info", "traffic: stopped");
+  }, []);
 
-  return {
-    distribution,
-    setDistribution,
-    burst,
-    startTraffic,
-    stopTraffic,
-    trafficRunning,
-  };
+  return useMemo(
+    () => ({
+      distribution,
+      setDistribution,
+      burst,
+      startTraffic,
+      stopTraffic,
+      trafficRunning,
+      burstProgress,
+    }),
+    [
+      distribution,
+      burst,
+      startTraffic,
+      stopTraffic,
+      trafficRunning,
+      burstProgress,
+    ],
+  );
 }

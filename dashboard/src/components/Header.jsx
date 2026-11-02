@@ -1,6 +1,7 @@
+import { memo } from "react";
 import { STRATEGIES } from "../lib/constants.js";
 
-export default function Header({
+function Header({
   health,
   connected,
   paused,
@@ -12,10 +13,18 @@ export default function Header({
   trafficRunning,
   onStartTraffic,
   onStopTraffic,
+  onPollNow,
+  lastPollAt,
+  pollLatency,
+  pollErrorCount,
+  polling,
 }) {
   const available = health?.available ?? 0;
   const total = health?.total ?? 0;
   const proxied = health?.lb?.totalProxied ?? 0;
+
+  // Age of last poll — this is the "is it alive?" indicator.
+  const age = lastPollAt ? Math.round((Date.now() - lastPollAt) / 1000) : null;
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-4 px-3.5 py-2.5 bg-panel border border-edge rounded-lg">
@@ -34,18 +43,26 @@ export default function Header({
             <span className="text-muted text-[11px]">proxied</span>
             <span className="font-semibold">{proxied.toLocaleString()}</span>
           </span>
-          <span className="flex gap-1.5 items-center">
+          <button
+            onClick={onPollNow}
+            disabled={polling}
+            className="flex gap-1.5 items-center bg-transparent border-none cursor-pointer"
+            title="Force refresh now"
+          >
             <span
               className={`inline-block w-2 h-2 rounded-full ${
                 connected
-                  ? "bg-ok shadow-[0_0_8px_#3fb950]"
+                  ? "bg-ok shadow-[0_0_8px_#3fb950] animate-pulse-ok"
                   : "bg-err shadow-[0_0_8px_#f85149]"
               }`}
             />
             <span className="text-muted text-[11px]">
               {connected ? "live" : "offline"}
+              {age != null && ` · ${age}s ago`}
+              {pollLatency != null && ` · ${pollLatency}ms`}
+              {pollErrorCount > 0 && ` · ${pollErrorCount} err`}
             </span>
-          </span>
+          </button>
           {paused && <span className="text-warn font-semibold">PAUSED</span>}
         </div>
       </div>
@@ -87,3 +104,5 @@ export default function Header({
     </header>
   );
 }
+
+export default memo(Header);

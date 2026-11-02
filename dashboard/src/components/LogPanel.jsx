@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 
 const LEVEL_CLASS = {
   info: "text-fg",
@@ -8,7 +8,7 @@ const LEVEL_CLASS = {
   cmd: "text-info",
 };
 
-export default function LogPanel({ logs, onClear }) {
+function LogPanel({ logs, onClear }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -18,7 +18,7 @@ export default function LogPanel({ logs, onClear }) {
   return (
     <div className="flex-[2] min-w-0 bg-panel border border-edge rounded-lg flex flex-col min-h-0 overflow-hidden">
       <div className="flex justify-between items-center px-3 py-2 border-b border-edge text-[11px] tracking-widest text-muted uppercase">
-        <span>LIVE LOG</span>
+        <span>LIVE LOG · {logs.length}</span>
         <button className="btn btn-ghost" onClick={onClear}>
           clear
         </button>
@@ -34,6 +34,9 @@ export default function LogPanel({ logs, onClear }) {
             </span>
             <span className={`break-all ${LEVEL_CLASS[l.level] || "text-fg"}`}>
               {l.msg}
+              {l.count > 1 && (
+                <span className="text-muted ml-2">×{l.count}</span>
+              )}
             </span>
           </div>
         ))}
@@ -41,3 +44,5 @@ export default function LogPanel({ logs, onClear }) {
     </div>
   );
 }
+
+export default memo(LogPanel);

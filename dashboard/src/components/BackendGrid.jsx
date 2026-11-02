@@ -1,6 +1,7 @@
+import { memo } from "react";
 import BackendCard from "./BackendCard.jsx";
 
-export default function BackendGrid({ servers, connected, busy, onAction }) {
+function BackendGrid({ servers, connected, busy, onAction }) {
   return (
     <section className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-2.5">
       {servers.length === 0 && (
@@ -14,3 +15,5 @@ export default function BackendGrid({ servers, connected, busy, onAction }) {
     </section>
   );
 }
+
+export default memo(BackendGrid);

@@ -27,6 +27,20 @@ export default {
           "monospace",
         ],
       },
+      keyframes: {
+        "pulse-ok": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.35" },
+        },
+        fade: {
+          from: { opacity: "0", transform: "translateY(-2px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "pulse-ok": "pulse-ok 1.4s ease-in-out infinite",
+        fade: "fade 0.4s ease-out",
+      },
     },
   },
   plugins: [],

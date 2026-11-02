@@ -1,8 +1,21 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { STRATEGIES } from "../constants.js";
 import { fetchJSON } from "../api.js";
 
-export function useCommandLine({ logs, health, traffic, tests, reset }) {
+export function useCommandLine({
+  log,
+  clearLogs,
+  healthSnapshotRef,
+  changeStrategy,
+  serverAction,
+  setPaused,
+  burst,
+  startTraffic,
+  stopTraffic,
+  setDistribution,
+  tests,
+  reset,
+}) {
   const [cmd, setCmd] = useState("");
   const [history, setHistory] = useState([]);
   const [histIdx, setHistIdx] = useState(-1);
@@ -13,7 +26,7 @@ export function useCommandLine({ logs, health, traffic, tests, reset }) {
       if (!line) return;
       setHistory((prev) => [...prev, line]);
       setHistIdx(-1);
-      logs.log("cmd", `> ${line}`);
+      log("cmd", `> ${line}`);
 
       const [name, ...args] = line.split(/\s+/);
       const n = name.toLowerCase();
@@ -21,86 +34,89 @@ export function useCommandLine({ logs, health, traffic, tests, reset }) {
       try {
         switch (n) {
           case "help":
-            logs.log(
+            log(
               "info",
-              "help | health | config | clear | burst <n> | traffic start <rps> | traffic stop | strategy <name> | enable|disable|drain|undrain <name> | reset | test <id> | tests",
+              "help | health | config | clear | burst <n> | traffic start <rps> | traffic stop | strategy <name> | enable|disable|drain|undrain <name> | reset | test <id> | tests | poll",
             );
             break;
           case "health":
-            if (health.health) logs.log("info", JSON.stringify(health.health));
+            if (healthSnapshotRef.current)
+              log("info", JSON.stringify(healthSnapshotRef.current));
+            else log("warn", "no health snapshot yet");
             break;
           case "config": {
             const r = await fetchJSON("/admin/config");
-            logs.log(
+            log(
               "info",
               `strategy=${r.strategy} ports=${r.ports?.join(",")} weights=${JSON.stringify(r.weights || {})}`,
             );
             break;
           }
           case "clear":
-            logs.clear();
-            traffic.setDistribution({});
+            clearLogs();
+            setDistribution({});
             break;
           case "strategy":
             if (!args[0])
-              return logs.log(
-                "error",
-                `usage: strategy ${STRATEGIES.join("|")}`,
-              );
-            await health.changeStrategy(args[0]);
+              return log("error", `usage: strategy ${STRATEGIES.join("|")}`);
+            await changeStrategy(args[0]);
             break;
           case "burst":
-            await traffic.burst(
-              Math.min(5000, parseInt(args[0] || "100", 10) || 100),
-            );
+            await burst(Math.min(5000, parseInt(args[0] || "100", 10) || 100));
             break;
           case "traffic":
             if (args[0] === "start")
-              traffic.startTraffic(
-                Math.min(500, parseInt(args[1] || "20", 10) || 20),
-              );
-            else if (args[0] === "stop") traffic.stopTraffic();
-            else logs.log("error", "usage: traffic start <rps> | traffic stop");
+              startTraffic(Math.min(500, parseInt(args[1] || "20", 10) || 20));
+            else if (args[0] === "stop") stopTraffic();
+            else log("error", "usage: traffic start <rps> | traffic stop");
             break;
           case "enable":
           case "disable":
           case "drain":
           case "undrain":
-            if (!args[0]) return logs.log("error", `usage: ${n} <server-name>`);
-            await health.serverAction(args[0], n);
+            if (!args[0]) return log("error", `usage: ${n} <server-name>`);
+            await serverAction(args[0], n);
             break;
           case "reset":
             await reset.resetAllData();
             break;
           case "tests":
-            logs.log("info", tests.tests.map((t) => `  ${t.id}`).join("\n"));
+            log("info", tests.tests.map((t) => `  ${t.id}`).join("\n"));
             break;
           case "test": {
             const t = tests.tests.find((x) => x.id === args[0]);
             if (!t)
-              return logs.log(
-                "error",
-                `no test with id "${args[0]}". Try "tests".`,
-              );
+              return log("error", `no test with id "${args[0]}". Try "tests".`);
             await tests.runTest(t);
             break;
           }
           case "pause":
-            health.setPaused(true);
-            logs.log("info", "polling paused");
+            setPaused(true);
             break;
           case "resume":
-            health.setPaused(false);
-            logs.log("info", "polling resumed");
+            setPaused(false);
             break;
           default:
-            logs.log("error", `unknown command: "${name}". Type "help".`);
+            log("error", `unknown command: "${name}". Type "help".`);
         }
       } catch (err) {
-        logs.log("error", `command failed: ${err.message}`);
+        log("error", `command failed: ${err.message}`);
       }
     },
-    [logs, health, traffic, tests, reset],
+    [
+      log,
+      clearLogs,
+      healthSnapshotRef,
+      changeStrategy,
+      serverAction,
+      setPaused,
+      burst,
+      startTraffic,
+      stopTraffic,
+      setDistribution,
+      tests,
+      reset,
+    ],
   );
 
   const onKeyDown = useCallback(
@@ -126,11 +142,14 @@ export function useCommandLine({ logs, health, traffic, tests, reset }) {
         }
       } else if (e.key === "l" && e.ctrlKey) {
         e.preventDefault();
-        logs.clear();
+        clearLogs();
       }
     },
-    [cmd, history, histIdx, run, logs],
+    [cmd, history, histIdx, run, clearLogs],
   );
 
-  return { cmd, setCmd, run, onKeyDown };
+  return useMemo(
+    () => ({ cmd, setCmd, run, onKeyDown }),
+    [cmd, run, onKeyDown],
+  );
 }

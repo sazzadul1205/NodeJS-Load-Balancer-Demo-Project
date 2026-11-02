@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useRef, useEffect, useMemo } from "react";
 
 import { useLogs } from "./lib/hooks/useLogs.js";
 import { useHealthPoll } from "./lib/hooks/useHealthPoll.js";
@@ -15,34 +15,56 @@ import TestsPanel from "./components/TestsPanel.jsx";
 import Terminal from "./components/Terminal.jsx";
 
 export default function App() {
-  // Compose hooks in dependency order — no cycles.
   const logs = useLogs();
   const health = useHealthPoll(logs.log);
   const traffic = useTraffic(logs.log);
-  const reset = useReset({ logs, health, traffic });
-  const tests = useTests({ logs, health, traffic });
-  const cli = useCommandLine({ logs, health, traffic, tests, reset });
 
-  // UI-safe wrappers: hooks throw, we catch + log here so buttons never crash.
-  const safeChangeStrategy = useCallback(
-    (s) =>
-      health
-        .changeStrategy(s)
-        .catch((err) =>
-          logs.log("error", `strategy change failed: ${err.message}`),
-        ),
-    [health, logs],
-  );
+  // Refs for hooks that need "latest value at call time" without
+  // re-creating callbacks on every poll.
+  const serversRef = useRef([]);
+  const strategyRef = useRef("");
+  const healthSnapshotRef = useRef(null);
+  useEffect(() => {
+    serversRef.current = health.servers;
+  }, [health.servers]);
+  useEffect(() => {
+    strategyRef.current = health.strategy;
+  }, [health.strategy]);
+  useEffect(() => {
+    healthSnapshotRef.current = health.health;
+  }, [health.health]);
 
-  const safeServerAction = useCallback(
-    (name, action) =>
-      health
-        .serverAction(name, action)
-        .catch((err) =>
-          logs.log("error", `${action} ${name} failed: ${err.message}`),
-        ),
-    [health, logs],
-  );
+  const reset = useReset({
+    log: logs.log,
+    resetLB: health.resetLB,
+    setDistribution: traffic.setDistribution,
+  });
+
+  const tests = useTests({
+    log: logs.log,
+    burst: traffic.burst,
+    stopTraffic: traffic.stopTraffic,
+    setDistribution: traffic.setDistribution,
+    setStrategy: health.setStrategy,
+    resetLB: health.resetLB,
+    serversRef,
+    strategyRef,
+  });
+
+  const cli = useCommandLine({
+    log: logs.log,
+    clearLogs: logs.clear,
+    healthSnapshotRef,
+    changeStrategy: health.changeStrategy,
+    serverAction: health.serverAction,
+    setPaused: health.setPaused,
+    burst: traffic.burst,
+    startTraffic: traffic.startTraffic,
+    stopTraffic: traffic.stopTraffic,
+    setDistribution: traffic.setDistribution,
+    tests,
+    reset,
+  });
 
   return (
     <div className="grid grid-rows-[auto_auto_1fr_auto] gap-2.5 h-screen p-2.5">
@@ -52,25 +74,33 @@ export default function App() {
         paused={health.paused}
         onTogglePause={() => health.setPaused((p) => !p)}
         strategy={health.strategy}
-        onChangeStrategy={safeChangeStrategy}
+        onChangeStrategy={health.changeStrategy}
         onBurst100={() => traffic.burst(100)}
         onBurst1000={() => traffic.burst(1000)}
         trafficRunning={traffic.trafficRunning}
         onStartTraffic={() => traffic.startTraffic(20)}
         onStopTraffic={traffic.stopTraffic}
+        onPollNow={health.pollNow}
+        lastPollAt={health.lastPollAt}
+        pollLatency={health.pollLatency}
+        pollErrorCount={health.pollErrorCount}
+        polling={health.polling}
       />
 
       <BackendGrid
         servers={health.servers}
         connected={health.connected}
         busy={!!tests.runningTestId}
-        onAction={safeServerAction}
+        onAction={health.serverAction}
       />
 
       <main className="flex gap-2.5 min-h-0">
         <LogPanel logs={logs.entries} onClear={logs.clear} />
         <div className="flex-1 min-w-[300px] flex flex-col gap-2.5 min-h-0">
-          <DistributionPanel distribution={traffic.distribution} />
+          <DistributionPanel
+            distribution={traffic.distribution}
+            progress={traffic.burstProgress}
+          />
           <TestsPanel
             tests={tests.tests}
             testState={tests.testState}

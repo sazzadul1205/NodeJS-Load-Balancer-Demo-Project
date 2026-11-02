@@ -1,8 +1,17 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { TESTS } from "../../tests.js";
 import { fetchJSON, fetchRaw, postJSON } from "../api.js";
 
-export function useTests({ logs, health, traffic }) {
+export function useTests({
+  log,
+  burst,
+  stopTraffic,
+  setDistribution,
+  setStrategy,
+  resetLB,
+  serversRef,
+  strategyRef,
+}) {
   const [testState, setTestState] = useState({});
   const [runningTestId, setRunningTestId] = useState(null);
   const runningRef = useRef(false);
@@ -11,27 +20,27 @@ export function useTests({ logs, health, traffic }) {
     async (test) => {
       if (runningRef.current) return;
       runningRef.current = true;
-      traffic.stopTraffic();
+      stopTraffic();
 
       setRunningTestId(test.id);
       setTestState((prev) => ({ ...prev, [test.id]: { status: "running" } }));
-      logs.log("info", `▶ ${test.name}`);
+      log("info", `▶ ${test.name}`);
 
       const t0 = performance.now();
       const ctx = {
-        burst: (n) => traffic.burst(n, { updateUI: false }),
+        burst: (n) => burst(n, { updateUI: false }),
         setStrategy: async (s) => {
           await postJSON("/admin/strategy", { strategy: s });
-          health.setStrategy(s);
+          setStrategy(s);
         },
         serverAction: (name, action) =>
           postJSON(`/admin/servers/${name}/${action}`),
-        resetLB: health.resetLB,
-        showDistribution: (d) => traffic.setDistribution(d),
+        resetLB,
+        showDistribution: setDistribution,
         fetchJSON,
         fetchRaw,
-        servers: health.servers.slice(),
-        originalStrategy: health.strategy,
+        servers: (serversRef.current || []).slice(),
+        originalStrategy: strategyRef.current,
         pass: (detail) => ({ pass: true, detail }),
         fail: (detail) => ({ pass: false, detail }),
       };
@@ -47,7 +56,7 @@ export function useTests({ logs, health, traffic }) {
             ms,
           },
         }));
-        logs.log(
+        log(
           result.pass ? "success" : "error",
           `${result.pass ? "✓" : "✗"} ${test.name}: ${result.detail}`,
         );
@@ -57,20 +66,32 @@ export function useTests({ logs, health, traffic }) {
           ...prev,
           [test.id]: { status: "error", detail: err.message, ms },
         }));
-        logs.log("error", `✗ ${test.name}: ${err.message}`);
+        log("error", `✗ ${test.name}: ${err.message}`);
       } finally {
         runningRef.current = false;
         setRunningTestId(null);
       }
     },
-    [logs, health, traffic],
+    [
+      log,
+      burst,
+      stopTraffic,
+      setDistribution,
+      setStrategy,
+      resetLB,
+      serversRef,
+      strategyRef,
+    ],
   );
 
   const runAllTests = useCallback(async () => {
-    logs.log("info", `▶▶ running all ${TESTS.length} tests`);
+    log("info", `▶▶ running all ${TESTS.length} tests`);
     for (const t of TESTS) await runTest(t);
-    logs.log("success", "▶▶ all tests finished");
-  }, [runTest, logs]);
+    log("success", "▶▶ all tests finished");
+  }, [runTest, log]);
 
-  return { tests: TESTS, testState, runningTestId, runTest, runAllTests };
+  return useMemo(
+    () => ({ tests: TESTS, testState, runningTestId, runTest, runAllTests }),
+    [testState, runningTestId, runTest, runAllTests],
+  );
 }
