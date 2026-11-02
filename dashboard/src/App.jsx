@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, useCallback } from "react";
 
 import { useLogs } from "./lib/hooks/useLogs.js";
 import { useHealthPoll } from "./lib/hooks/useHealthPoll.js";
@@ -19,8 +19,9 @@ export default function App() {
   const health = useHealthPoll(logs.log);
   const traffic = useTraffic(logs.log);
 
-  // Refs for hooks that need "latest value at call time" without
-  // re-creating callbacks on every poll.
+  // Stable refs — survive re-renders so memoized children don't churn.
+  const { addServer, removeServer, serverAction, changeStrategy } = health;
+
   const serversRef = useRef([]);
   const strategyRef = useRef("");
   const healthSnapshotRef = useRef(null);
@@ -55,8 +56,10 @@ export default function App() {
     log: logs.log,
     clearLogs: logs.clear,
     healthSnapshotRef,
-    changeStrategy: health.changeStrategy,
-    serverAction: health.serverAction,
+    changeStrategy,
+    serverAction,
+    addServer,
+    removeServer,
     setPaused: health.setPaused,
     burst: traffic.burst,
     startTraffic: traffic.startTraffic,
@@ -66,6 +69,24 @@ export default function App() {
     reset,
   });
 
+  // Stable wrappers used by the grid.
+  const handleAddServer = useCallback(
+    (port, weight) => addServer(port, weight),
+    [addServer],
+  );
+  const handleRemoveServer = useCallback(
+    (name) => removeServer({ name }).catch(() => {}),
+    [removeServer],
+  );
+
+  // Suggest "next port" for the add-backend form.
+  const suggestedPort = useMemo(() => {
+    const ports = health.servers
+      .map((s) => parseInt(s.name.replace(/^api-/, ""), 10))
+      .filter((n) => Number.isInteger(n));
+    return ports.length ? Math.max(...ports) + 1 : 9001;
+  }, [health.servers]);
+
   return (
     <div className="grid grid-rows-[auto_auto_1fr_auto] gap-2.5 h-screen p-2.5">
       <Header
@@ -74,7 +95,7 @@ export default function App() {
         paused={health.paused}
         onTogglePause={() => health.setPaused((p) => !p)}
         strategy={health.strategy}
-        onChangeStrategy={health.changeStrategy}
+        onChangeStrategy={changeStrategy}
         onBurst100={() => traffic.burst(100)}
         onBurst1000={() => traffic.burst(1000)}
         trafficRunning={traffic.trafficRunning}
@@ -91,7 +112,10 @@ export default function App() {
         servers={health.servers}
         connected={health.connected}
         busy={!!tests.runningTestId}
-        onAction={health.serverAction}
+        onAction={serverAction}
+        onRemove={handleRemoveServer}
+        onAdd={handleAddServer}
+        suggestedPort={suggestedPort}
       />
 
       <main className="flex gap-2.5 min-h-0">

@@ -8,6 +8,8 @@ export function useCommandLine({
   healthSnapshotRef,
   changeStrategy,
   serverAction,
+  addServer,
+  removeServer,
   setPaused,
   burst,
   startTraffic,
@@ -36,7 +38,7 @@ export function useCommandLine({
           case "help":
             log(
               "info",
-              "help | health | config | clear | burst <n> | traffic start <rps> | traffic stop | strategy <name> | enable|disable|drain|undrain <name> | reset | test <id> | tests | poll",
+              "help | health | config | clear | burst <n> | traffic start <rps> | traffic stop | strategy <name> | enable|disable|drain|undrain <name> | add <port> [weight] | remove <name|port> | reset | test <id> | tests | pause | resume",
             );
             break;
           case "health":
@@ -77,11 +79,27 @@ export function useCommandLine({
             if (!args[0]) return log("error", `usage: ${n} <server-name>`);
             await serverAction(args[0], n);
             break;
+          case "add": {
+            const port = parseInt(args[0], 10);
+            const weight = parseInt(args[1] || "1", 10);
+            if (!Number.isInteger(port) || port < 1 || port > 65535) {
+              return log("error", "usage: add <port> [weight]");
+            }
+            await addServer(port, weight > 0 ? weight : 1);
+            break;
+          }
+          case "remove": {
+            if (!args[0]) return log("error", "usage: remove <name|port>");
+            const t = args[0];
+            if (/^\d+$/.test(t)) await removeServer({ port: parseInt(t, 10) });
+            else await removeServer({ name: t });
+            break;
+          }
           case "reset":
             await reset.resetAllData();
             break;
           case "tests":
-            log("info", tests.tests.map((t) => `  ${t.id}`).join("\n"));
+            log("info", tests.tests.map((x) => `  ${x.id}`).join("\n"));
             break;
           case "test": {
             const t = tests.tests.find((x) => x.id === args[0]);
@@ -109,6 +127,8 @@ export function useCommandLine({
       healthSnapshotRef,
       changeStrategy,
       serverAction,
+      addServer,
+      removeServer,
       setPaused,
       burst,
       startTraffic,

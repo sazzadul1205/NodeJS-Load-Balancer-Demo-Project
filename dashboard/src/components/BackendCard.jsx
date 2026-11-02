@@ -8,7 +8,7 @@ const BORDER = {
   draining: "border-l-warn",
 };
 
-function BackendCard({ server, busy, onAction }) {
+function BackendCard({ server, busy, onAction, onRemove }) {
   const status = !server.enabled
     ? "disabled"
     : server.draining
@@ -16,6 +16,15 @@ function BackendCard({ server, busy, onAction }) {
       : server.healthy
         ? "healthy"
         : "down";
+
+  const handleRemove = () => {
+    const warn =
+      server.activeRequests > 0
+        ? ` ${server.activeRequests} request(s) in flight — drain first for graceful removal.`
+        : "";
+    if (!window.confirm(`Remove ${server.name}?${warn}`)) return;
+    onRemove(server.name);
+  };
 
   return (
     <div
@@ -51,7 +60,7 @@ function BackendCard({ server, busy, onAction }) {
         </div>
       </div>
 
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 items-center">
         {server.enabled ? (
           <>
             <button
@@ -88,6 +97,14 @@ function BackendCard({ server, busy, onAction }) {
             enable
           </button>
         )}
+        <button
+          className="btn btn-ghost ml-auto px-2 text-muted hover:text-err"
+          disabled={busy}
+          onClick={handleRemove}
+          title={`Remove ${server.name} from the LB`}
+        >
+          ×
+        </button>
       </div>
 
       {server.lastError && (
@@ -97,10 +114,10 @@ function BackendCard({ server, busy, onAction }) {
   );
 }
 
-// Only re-render when the fields BackendCard actually uses have changed.
 export default memo(BackendCard, (prev, next) => {
   if (prev.busy !== next.busy) return false;
   if (prev.onAction !== next.onAction) return false;
+  if (prev.onRemove !== next.onRemove) return false;
   const a = prev.server;
   const b = next.server;
   return (

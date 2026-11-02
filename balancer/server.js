@@ -572,6 +572,42 @@ async function handleAdmin(req, res, pathname) {
     return json(res, 200, { ok: true, reset: "counters" });
   }
 
+  // POST /admin/servers/add — register a new backend port at runtime
+  if (req.method === "POST" && pathname === "/admin/servers/add") {
+    const body = await readJson(req);
+    const port = parseInt(body.port, 10);
+    const weight = parseInt(body.weight || 1, 10);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      return json(res, 400, { error: "invalid port" });
+    }
+    if (servers.some((s) => s.port === port)) {
+      return json(res, 409, { error: "port already registered" });
+    }
+    const b = new Backend(port, weight > 0 ? weight : 1);
+    servers.push(b);
+    console.log(`[admin] added backend api-${port}`);
+    return json(res, 201, serverSnapshot(b));
+  }
+
+  // POST /admin/servers/remove — deregister a backend by name or port
+  if (req.method === "POST" && pathname === "/admin/servers/remove") {
+    const body = await readJson(req);
+    const name = body.name;
+    const port = parseInt(body.port, 10);
+    const idx = servers.findIndex((s) =>
+      name ? s.name === name : s.port === port,
+    );
+    if (idx === -1) {
+      return json(res, 404, { error: "backend not found" });
+    }
+    const [removed] = servers.splice(idx, 1);
+    try {
+      removed.agent.destroy();
+    } catch {}
+    console.log(`[admin] removed backend ${removed.name}`);
+    return json(res, 200, { ok: true, removed: removed.name });
+  }
+
   // POST /admin/servers/:name/(enable|disable|drain|undrain)
   const match = pathname.match(
     /^\/admin\/servers\/([^/]+)\/(enable|disable|drain|undrain)$/,

@@ -228,4 +228,67 @@ export const TESTS = [
       );
     },
   },
+  {
+    id: "dynamic-registration",
+    name: "Dynamic add/remove",
+    description:
+      "Register a fresh port at runtime, verify it appears, then deregister it. Uses a throwaway port that nothing is listening on.",
+    async run(ctx) {
+      const testPort = 19999;
+
+      // Clean any leftover from a prior aborted run.
+      const before = await ctx.fetchJSON("/admin/health");
+      if (before.servers.some((s) => s.name === `api-${testPort}`)) {
+        await ctx.fetchJSON("/admin/servers/remove", {
+          method: "POST",
+          body: { port: testPort },
+        });
+      }
+
+      try {
+        const add = await ctx.fetchJSON("/admin/servers/add", {
+          method: "POST",
+          body: { port: testPort, weight: 2 },
+        });
+        if (add.name !== `api-${testPort}`) {
+          return ctx.fail(`add returned wrong name: ${add.name}`);
+        }
+        if (add.weight !== 2) {
+          return ctx.fail(`weight mismatch: expected 2, got ${add.weight}`);
+        }
+
+        const mid = await ctx.fetchJSON("/admin/health");
+        const found = mid.servers.find((s) => s.name === `api-${testPort}`);
+        if (!found) {
+          return ctx.fail(
+            `api-${testPort} not present in /admin/health after add`,
+          );
+        }
+
+        const remove = await ctx.fetchJSON("/admin/servers/remove", {
+          method: "POST",
+          body: { port: testPort },
+        });
+        if (remove.removed !== `api-${testPort}`) {
+          return ctx.fail(`remove returned wrong name: ${remove.removed}`);
+        }
+
+        const after = await ctx.fetchJSON("/admin/health");
+        if (after.servers.some((s) => s.name === `api-${testPort}`)) {
+          return ctx.fail(`api-${testPort} still present after remove`);
+        }
+
+        return ctx.pass(`added + removed api-${testPort} (weight=2) cleanly`);
+      } catch (err) {
+        // Best-effort cleanup so a failed test doesn't pollute state.
+        try {
+          await ctx.fetchJSON("/admin/servers/remove", {
+            method: "POST",
+            body: { port: testPort },
+          });
+        } catch {}
+        throw err;
+      }
+    },
+  },
 ];
